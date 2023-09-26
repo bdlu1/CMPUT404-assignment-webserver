@@ -34,7 +34,6 @@ class MyWebServer(socketserver.BaseRequestHandler):
     
         requests = self.data.split('\r\n') # split() data here
         requestsList = requests[0].split() # split the request into the method used and fileRequested/file
-        #print(requestsList)
 
         method = requestsList[0]
         fileRequested = requestsList[1]
@@ -55,27 +54,23 @@ class MyWebServer(socketserver.BaseRequestHandler):
         if fileRequested.endswith('/'): # open the default index.html page * this also catches the case where fileRequested only contains '/'
             try: # case 1 the extension is '/' or the file requested is just the '/' character
                 fileToOpen = root + fileRequested + 'index.html'
-                print(' 1 This is the file to open: ' + fileToOpen)
                 fileOpen = open(fileToOpen, "r")
                 fileContent = fileOpen.read()
                 fileOpen.close()            
                 self.handle200(fileContent, contentTypes[0])
                 return
             except FileNotFoundError:
-                print('404 inside "/"')
                 self.handle404() # throw 404 if file not found
 
         elif fileRequested.endswith('.html'):
             try: # case 2 the extension is .html
                 fileToOpen = root + fileRequested 
-                print(' 2 This is the file to open: ' + fileToOpen)
                 fileOpen = open(fileToOpen)
                 fileContent = fileOpen.read()
                 fileOpen.close()            
                 self.handle200(fileContent, contentTypes[0]) # use correct mime-type
 
             except FileNotFoundError:
-                print('404 inside ".html"')
                 self.handle404()
         
         elif fileRequested.endswith('.css'):
