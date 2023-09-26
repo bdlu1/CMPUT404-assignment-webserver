@@ -1,6 +1,6 @@
 #  coding: utf-8 
 import socketserver
-
+import os
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,13 +26,98 @@ import socketserver
 
 # try: curl -v -X GET http://127.0.0.1:8080/
 
-
 class MyWebServer(socketserver.BaseRequestHandler):
     
     def handle(self):
-        self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        self.data = self.request.recv(1024).decode() # decode the data from utf-8 
+
+    
+        requests = self.data.split('\r\n') # split() data here
+        requestsList = requests[0].split() # split the request into the method used and fileRequested/file
+        #print(requestsList)
+
+        method = requestsList[0]
+        fileRequested = requestsList[1]
+
+        root = './www'
+
+        contentTypes = ['Content-Type: text/html\r\n',
+                        'Content-Type: text/css\r\n']
+        
+        if method != 'GET':
+            self.handle405()
+        else:
+            self.default(fileRequested, root, contentTypes)
+        
+
+    def default(self, fileRequested, root, contentTypes): 
+
+        if fileRequested.endswith('/'): # open the default index.html page * this also catches the case where fileRequested only contains '/'
+            try: # case 1 the extension is '/' or the file requested is just the '/' character
+                fileToOpen = root + fileRequested + 'index.html'
+                print(' 1 This is the file to open: ' + fileToOpen)
+                fileOpen = open(fileToOpen, "r")
+                fileContent = fileOpen.read()
+                fileOpen.close()            
+                self.handle200(fileContent, contentTypes[0])
+                return
+            except FileNotFoundError:
+                print('404 inside "/"')
+                self.handle404() # throw 404 if file not found
+
+        elif fileRequested.endswith('.html'):
+            try: # case 2 the extension is .html
+                fileToOpen = root + fileRequested 
+                print(' 2 This is the file to open: ' + fileToOpen)
+                fileOpen = open(fileToOpen)
+                fileContent = fileOpen.read()
+                fileOpen.close()            
+                self.handle200(fileContent, contentTypes[0]) # use correct mime-type
+
+            except FileNotFoundError:
+                print('404 inside ".html"')
+                self.handle404()
+        
+        elif fileRequested.endswith('.css'):
+            try: # case 3 the extension is .css 
+                fileToOpen = root + fileRequested 
+                fileOpen = open(fileToOpen)
+                fileContent = fileOpen.read()
+                fileOpen.close()            
+                self.handle200(fileContent, contentTypes[1]) # use css mime-type
+
+            except FileNotFoundError:
+                self.handle404()
+        
+        else: # this case is where path doesn't contain any of the previous extensions
+              # therefore its a path that needs redirection
+            fileRequested = fileRequested + '/'
+            self.handle301(fileRequested)
+
+               
+        
+    def handle200(self, fileContent, contentType):
+        #print('inside 200')
+        response = f'HTTP/1.1 200 OK\r\n{contentType}\r\n' + fileContent
+        self.request.sendall(response.encode())
+        return
+    
+    def handle301(self, location):
+        response = f'HTTP/1.1 301 FILE MOVED\r\nLocation: {location}\r\n'
+        self.request.sendall(response.encode())
+        return
+
+    def handle404(self):
+        print('inside 404')
+        response = 'HTTP/1.1 404 FILE NOT FOUND\n\n'
+        self.request.sendall(response.encode())
+        return 
+    
+    def handle405(self):
+        response = 'HTTP/1.1 405 INVALID METHOD\n\nInvalid Method Used'
+        self.request.sendall(response.encode())
+        return
+
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
